@@ -3,124 +3,144 @@ import Candidate from '../models/Candidate.js';
 import Job from '../models/Job.js';
 import Conversation from '../models/Conversation.js';
 import Appointment from '../models/Appointment.js';
-import voiceService from '../services/voiceService.js';
 import dialogueService from '../services/dialogueService.js';
 import entityExtractionService from '../services/entityExtractionService.js';
 import config from '../config/config.js';
 
 const voiceAgentController = {
   // Initiate a call with a candidate
-  initiateCall: async (req, res) => {
-    try {
-      const { candidate_id, job_id } = req.body;
-      
-      // Verify that job and candidate exist
-      const job = await Job.findByPk(job_id);
-      if (!job) {
-        return res.status(404).json({
-          success: false,
-          message: 'Job not found'
-        });
-      }
-      
-      const candidate = await Candidate.findByPk(candidate_id);
-      if (!candidate) {
-        return res.status(404).json({
-          success: false,
-          message: 'Candidate not found'
-        });
-      }
-      
-      // In a real implementation, this would actually make a call
-      // For now, we'll just simulate the call flow
-      
-      // Create a conversation record to track this interaction
-      const conversation = await Conversation.create({
-        candidate_id,
-        transcript: `Call initiated for job: ${job.title}`,
-        entities_extracted: {}
-      });
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Call initiated successfully',
-        conversation_id: conversation.id,
-        data: {
-          candidate: candidate,
-          job: job
-        }
-      });
-    } catch (error) {
-      console.error('Error initiating call:', error);
-      return res.status(500).json({
+// Inside the initiateCall method:
+
+initiateCall: async (req, res) => {
+  try {
+    const { candidate_id, job_id } = req.body;
+    
+    // Verify that job and candidate exist
+    const job = await Job.findByPk(job_id);
+    if (!job) {
+      return res.status(404).json({
         success: false,
-        message: 'Failed to initiate call',
-        error: error.message
+        message: 'Job not found'
       });
     }
-  },
+    
+    const candidate = await Candidate.findByPk(candidate_id);
+    if (!candidate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Candidate not found'
+      });
+    }
+    
+    // Create a conversation record to track this interaction
+    const conversation = await Conversation.create({
+      candidate_id,
+      transcript: `Call initiated for job: ${job.title}`,
+      entities_extracted: {}
+    });
+    
+    // Generate greeting based on company name and job title
+    const greeting = `Hello ${candidate.name}, this is ${config.companyName} calling regarding a ${job.title} opportunity. Are you interested in hearing more about this role?`;
+    
+    // Update transcript with the greeting
+    await conversation.update({
+      transcript: conversation.transcript + '\nAgent: ' + greeting
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Call initiated successfully',
+      conversation_id: conversation.id,
+      greeting: greeting,
+      stage: dialogueService.CONVERSATION_STAGES.GREETING,
+      data: {
+        candidate: candidate,
+        job: job
+      }
+    });
+  } catch (error) {
+    console.error('Error initiating call:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to initiate call',
+      error: error.message
+    });
+  }
+},
   
-  // Process speech to text
-  processSpeech: async (req, res) => {
-    try {
-      // This would typically receive audio data and use Vosk to convert to text
-      // For simulation purposes, we'll just accept text directly
-      
-      const { conversation_id, audio_text } = req.body;
-      
-      if (!audio_text) {
-        return res.status(400).json({
-          success: false,
-          message: 'No speech input provided'
-        });
-      }
-      
-      // Retrieve conversation to update
-      const conversation = await Conversation.findByPk(conversation_id);
-      if (!conversation) {
-        return res.status(404).json({
-          success: false,
-          message: 'Conversation not found'
-        });
-      }
-      
-      // Extract entities from the text
-      const entities = await entityExtractionService.extractEntities(audio_text);
-      
-      // Update conversation with new transcript and entities
-      const updatedTranscript = conversation.transcript + '\nCandidate: ' + audio_text;
-      const updatedEntities = { ...conversation.entities_extracted, ...entities };
-      
-      await conversation.update({
-        transcript: updatedTranscript,
-        entities_extracted: updatedEntities
-      });
-      
-      // Process dialogue and get appropriate response
-      const response = await dialogueService.processDialogue(audio_text, entities, conversation_id);
-      
-      // Update transcript with agent response
-      await conversation.update({
-        transcript: conversation.transcript + '\nAgent: ' + response
-      });
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          input: audio_text,
-          entities: entities,
-          response: response
-        }
-      });
-    } catch (error) {
-      console.error('Error processing speech:', error);
-      return res.status(500).json({
+
+
+// Process speech to text
+// Process speech to text
+// Process speech to text
+// Process speech to text
+processSpeech: async (req, res) => {
+  try {
+    // This would typically receive audio data and use Vosk to convert to text
+    // For simulation purposes, we'll just accept text directly
+    
+    const { conversation_id, audio_text } = req.body;
+    
+    if (!audio_text) {
+      return res.status(400).json({
         success: false,
-        message: 'Failed to process speech',
-        error: error.message
+        message: 'No speech input provided'
       });
     }
-  },
+    
+    // Retrieve conversation to update
+    const conversation = await Conversation.findByPk(conversation_id);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+    
+    // Extract entities from the text
+    const entities = await entityExtractionService.extractEntities(audio_text);
+    
+    // Update conversation with new transcript and entities
+    const updatedTranscript = conversation.transcript + '\nCandidate: ' + audio_text;
+    const updatedEntities = { ...conversation.entities_extracted, ...entities };
+    
+    await conversation.update({
+      transcript: updatedTranscript,
+      entities_extracted: updatedEntities
+    });
+    
+    // Process dialogue and get appropriate response
+    const response = await dialogueService.processDialogue(audio_text, entities, conversation_id);
+    
+    // Determine the current conversation stage AFTER processing the dialogue
+    // This ensures the stage reflects any changes from the user's input
+    const currentStage = dialogueService.determineConversationStage(conversation);
+    
+    // Update transcript with agent response
+    await conversation.update({
+      transcript: conversation.transcript + '\nAgent: ' + response
+    });
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        input: audio_text,
+        entities: entities,
+        response: response,
+        stage: currentStage
+      }
+    });
+  } catch (error) {
+    console.error('Error processing speech:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process speech',
+      error: error.message
+    });
+  }
+},
+
+// ...existing code...
   
   // Generate speech from text
   generateSpeech: async (req, res) => {
